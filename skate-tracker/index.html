@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#14161B">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>OLLIELOG — skate session tracker</title>
+<style>
+/* ============ asphalt & safety-cone tokens ============ */
+:root{
+  --tar:#14161B;          /* ground — asphalt, blue-biased near-black */
+  --slab:#1E2128;         /* card surface */
+  --slab-2:#262A33;       /* raised surface / chips */
+  --seam:#333845;         /* hairline borders */
+  --chalk:#F2EFE6;        /* primary ink — warm chalk */
+  --dusk:#98A0AD;         /* secondary ink */
+  --faint:#5C6370;        /* muted ink / grid */
+  --cone:#FF5A1F;         /* accent — safety cone (large text & UI) */
+  --cone-deep:#F04D0E;    /* validated chart-mark orange on dark */
+  --sky:#3D8BE8;          /* second series (speed) — CVD-safe vs orange */
+  --good:#35C26E;         /* status: locked / live */
+  --warn:#E8B10D;         /* status: waiting */
+  --bad:#E05252;          /* status: denied / delete */
+  --radius:14px;
+  --pad:16px;
+}
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html{ background:var(--tar); }
+body{
+  font-family:-apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background:
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2"/><feColorMatrix values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0"/></filter><rect width="160" height="160" filter="url(%23n)"/></svg>') repeat,
+    var(--tar);
+  color:var(--chalk);
+  min-height:100dvh;
+  overscroll-behavior-y:contain;
+  -webkit-font-smoothing:antialiased;
+}
+#app{
+  max-width:440px; margin:0 auto; min-height:100dvh;
+  padding:calc(env(safe-area-inset-top, 0px) + 14px) var(--pad) calc(env(safe-area-inset-bottom, 0px) + 28px);
+  display:flex; flex-direction:column; gap:14px;
+}
+/* ---- type ---- */
+.eyebrow{ font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--dusk); }
+.wordmark{ font-size:26px; font-weight:900; font-style:italic; letter-spacing:-.02em; }
+.wordmark .dot{ color:var(--cone); }
+h2{ font-size:15px; font-weight:800; letter-spacing:.02em; }
+.num{ font-variant-numeric:tabular-nums; }
+.display{ font-weight:900; font-style:italic; letter-spacing:-.03em; line-height:.95; }
+/* ---- surfaces ---- */
+.card{ background:var(--slab); border:1px solid var(--seam); border-radius:var(--radius); padding:14px; }
+.tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.tile{ background:var(--slab); border:1px solid var(--seam); border-radius:var(--radius); padding:12px 10px 10px; display:flex; flex-direction:column; gap:6px; min-width:0; }
+.tile .v{ font-size:26px; } .tile .u{ font-size:12px; font-weight:700; color:var(--dusk); font-style:normal; letter-spacing:0; margin-left:2px; }
+.tile .k{ font-size:10px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.tile.hero{ grid-column:1 / -1; flex-direction:row; align-items:baseline; justify-content:space-between; padding:16px 14px; }
+.tile.hero .v{ font-size:56px; color:var(--cone); }
+/* ---- chips ---- */
+.chips{ display:flex; gap:6px; flex-wrap:wrap; }
+.chip{ display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--dusk); background:var(--slab-2); border:1px solid var(--seam); border-radius:999px; padding:5px 10px; }
+.chip .led{ width:7px; height:7px; border-radius:50%; background:var(--faint); flex:none; }
+.chip.ok .led{ background:var(--good); box-shadow:0 0 6px var(--good); }
+.chip.wait .led{ background:var(--warn); }
+.chip.err .led{ background:var(--bad); }
+/* ---- buttons ---- */
+button{ font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+.btn{
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  border-radius:var(--radius); padding:16px; font-size:16px; font-weight:900; font-style:italic;
+  letter-spacing:.04em; text-transform:uppercase; border:1px solid var(--seam); background:var(--slab-2); color:var(--chalk);
+}
+.btn:active{ transform:translateY(1px); }
+.btn.primary{ background:var(--cone); border-color:var(--cone); color:#140B06; box-shadow:0 6px 24px rgba(240,77,14,.28); }
+.btn.danger{ color:var(--bad); border-color:#4a2a2a; }
+.btn.ghost{ background:transparent; }
+.btn:focus-visible, .listrow:focus-visible, .iconbtn:focus-visible{ outline:2px solid var(--cone); outline-offset:2px; }
+.btnrow{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.iconbtn{ font-size:13px; font-weight:700; color:var(--dusk); padding:8px 10px; border-radius:10px; }
+/* ---- session list ---- */
+.list{ display:flex; flex-direction:column; gap:8px; }
+.listrow{
+  display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:12px; width:100%; text-align:left;
+  background:var(--slab); border:1px solid var(--seam); border-radius:var(--radius); padding:13px 14px;
+}
+.listrow .when{ font-size:14px; font-weight:800; } .listrow .sub{ font-size:12px; color:var(--dusk); margin-top:2px; }
+.listrow .big{ font-size:22px; color:var(--cone); } .listrow .arrow{ color:var(--faint); font-size:18px; }
+/* ---- live view ---- */
+.counterwrap{ text-align:center; padding:14px 0 4px; }
+.counter{ font-size:clamp(96px,34vw,150px); color:var(--chalk); }
+.counter.flash{ animation:pop .35s ease; }
+@keyframes pop{ 0%{ transform:scale(1);} 30%{ transform:scale(1.07); color:var(--cone);} 100%{ transform:scale(1);} }
+@media (prefers-reduced-motion: reduce){ .counter.flash{ animation:none; } }
+.lastair{ font-size:13px; color:var(--dusk); margin-top:6px; font-weight:700; }
+.lastair b{ color:var(--cone); font-style:italic; }
+.timer{ font-size:15px; font-weight:800; color:var(--dusk); }
+canvas#wave{ width:100%; height:96px; display:block; border-radius:10px; background:var(--tar); border:1px solid var(--seam); }
+.wavehead{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; }
+/* ---- detail ---- */
+.statgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.routewrap{ background:var(--tar); border:1px solid var(--seam); border-radius:10px; overflow:hidden; }
+svg.route{ display:block; width:100%; height:auto; }
+.airchart{ overflow-x:auto; }
+.airchart svg{ display:block; }
+.legendnote{ font-size:11px; color:var(--faint); margin-top:6px; }
+/* ---- misc ---- */
+.spacer{ flex:1; }
+.hint{ font-size:12.5px; color:var(--dusk); line-height:1.5; }
+.banner{ font-size:13px; line-height:1.5; color:var(--chalk); background:#3A2417; border:1px solid #6b3a1c; border-radius:10px; padding:10px 12px; }
+.empty{ text-align:center; padding:28px 10px; color:var(--dusk); font-size:14px; line-height:1.6; }
+.empty .big{ font-size:40px; margin-bottom:6px; }
+#toast{
+  position:fixed; left:50%; bottom:calc(env(safe-area-inset-bottom,0px) + 24px); transform:translateX(-50%) translateY(20px);
+  background:var(--slab-2); border:1px solid var(--seam); color:var(--chalk); font-size:13px; font-weight:700;
+  border-radius:14px; padding:10px 18px; opacity:0; pointer-events:none; transition:.25s; z-index:60;
+  max-width:calc(100vw - 40px); text-align:center; line-height:1.4;
+}
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+#pocket{
+  position:fixed; inset:0; background:#000; z-index:50; display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:12px;
+}
+#pocket.show{ display:flex; }
+#pocket .pc{ font-size:120px; color:var(--cone); opacity:.35; }
+#pocket .ph{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#333; font-weight:700; }
+.view{ display:none; flex-direction:column; gap:14px; }
+.view.active{ display:flex; }
+header.bar{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.seg{ display:flex; background:var(--slab); border:1px solid var(--seam); border-radius:10px; padding:3px; gap:2px; }
+.seg button{ flex:1; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--dusk); padding:7px 10px; border-radius:8px; }
+.seg button.on{ background:var(--slab-2); color:var(--chalk); border:1px solid var(--seam); }
+.settingsrow{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= HOME ================= -->
+  <section id="view-home" class="view active">
+    <header class="bar">
+      <div>
+        <div class="wordmark">OLLIE<span class="dot">/</span>LOG</div>
+        <div class="eyebrow">ollie counter · session log</div>
+      </div>
+    </header>
+
+    <div class="tiles" id="career-tiles"></div>
+
+    <button class="btn primary" id="btn-start">▶&nbsp; Start session</button>
+
+    <div class="settingsrow card">
+      <div>
+        <h2>Detector sensitivity</h2>
+        <div class="hint">Strict counts only clean pops.</div>
+      </div>
+      <div class="seg" id="sens-seg" role="group" aria-label="Detector sensitivity">
+        <button data-s="chill">Chill</button><button data-s="std">Std</button><button data-s="strict">Strict</button>
+      </div>
+    </div>
+
+    <h2 class="eyebrow" style="margin-top:4px">Sessions</h2>
+    <div class="list" id="session-list"></div>
+  </section>
+
+  <!-- ================= LIVE ================= -->
+  <section id="view-live" class="view">
+    <header class="bar">
+      <div class="wordmark" style="font-size:18px">LIVE<span class="dot">/</span>SESSION</div>
+      <div class="timer num" id="live-timer">0:00</div>
+    </header>
+    <div class="chips" id="live-chips">
+      <span class="chip" id="chip-motion"><span class="led"></span>Motion</span>
+      <span class="chip" id="chip-gps"><span class="led"></span>GPS</span>
+      <span class="chip" id="chip-wake"><span class="led"></span>Screen</span>
+    </div>
+    <div id="live-banner" style="display:none" class="banner"></div>
+
+    <div class="counterwrap">
+      <div class="eyebrow">Ollies landed</div>
+      <div class="counter display num" id="live-count">0</div>
+      <div class="lastair" id="live-lastair">pop one to open the count</div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><span class="v display num" id="lv-speed">0<span class="u">mph</span></span><span class="k">Speed now</span></div>
+      <div class="tile"><span class="v display num" id="lv-maxspeed">0<span class="u">mph</span></span><span class="k">Top speed</span></div>
+      <div class="tile"><span class="v display num" id="lv-dist">0<span class="u">mi</span></span><span class="k">Distance</span></div>
+      <div class="tile"><span class="v display num" id="lv-maxg">0<span class="u">g</span></span><span class="k">Peak force</span></div>
+      <div class="tile"><span class="v display num" id="lv-lean">0<span class="u">°</span></span><span class="k">Max lean</span></div>
+      <div class="tile"><span class="v display num" id="lv-air">—</span><span class="k">Best air</span></div>
+    </div>
+
+    <div class="card">
+      <div class="wavehead"><h2>Accelerometer</h2><span class="legendnote">live g-force · 4s window</span></div>
+      <canvas id="wave" height="96"></canvas>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn" id="btn-pocket">🌑&nbsp; Pocket mode</button>
+      <button class="btn danger" id="btn-stop">■&nbsp; End session</button>
+    </div>
+  </section>
+
+  <!-- ================= DETAIL ================= -->
+  <section id="view-detail" class="view">
+    <header class="bar">
+      <button class="iconbtn" id="btn-back">‹ Sessions</button>
+      <button class="iconbtn" id="btn-delete" style="color:var(--bad)">Delete</button>
+    </header>
+    <div>
+      <div class="wordmark" style="font-size:22px" id="d-title">Session</div>
+      <div class="eyebrow" id="d-sub"></div>
+    </div>
+    <div class="statgrid" id="d-stats"></div>
+
+    <div class="card">
+      <div class="wavehead"><h2>Airtime per ollie</h2><span class="legendnote num" id="d-aircount"></span></div>
+      <div class="airchart" id="d-airchart"></div>
+      <div class="legendnote">Each bar is one landed ollie, in order. Longest air is labeled.</div>
+    </div>
+
+    <div class="card">
+      <div class="wavehead"><h2>Route</h2><span class="legendnote num" id="d-routemeta"></span></div>
+      <div class="routewrap" id="d-route"></div>
+      <div class="legendnote">◦ start &nbsp;·&nbsp; ● end</div>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn" id="btn-apple">&nbsp;Apple Maps</button>
+      <button class="btn" id="btn-gmaps">Google Maps</button>
+    </div>
+    <button class="btn ghost" id="btn-gpx">⤓&nbsp; Export route (GPX)</button>
+  </section>
+
+</div>
+
+<div id="pocket" role="button" aria-label="Pocket mode — triple tap to exit">
+  <div class="ph">Recording</div>
+  <div class="pc display num" id="pocket-count">0</div>
+  <div class="ph">Triple-tap to exit · keep screen facing your leg</div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   OLLIELOG — standalone skate session tracker
+   Sensors: DeviceMotion (ollie detection, g-force, lean), Geolocation
+   (speed, distance, route). Data stays on-device in localStorage.
+   ===================================================================== */
+
+/* ---------- tiny utils ---------- */
+const $ = (id) => document.getElementById(id);
+const MS2G = 1 / 9.80665;
+const MPS2MPH = 2.2369362921;
+const M2MI = 1 / 1609.344;
+const fmt1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
+const pad2 = (n) => String(n).padStart(2, '0');
+function fmtClock(ms){ const s = Math.floor(ms/1000); const m = Math.floor(s/60); const h = Math.floor(m/60);
+  return h ? `${h}:${pad2(m%60)}:${pad2(s%60)}` : `${m}:${pad2(s%60)}`; }
+function fmtDate(t){ return new Date(t).toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'}); }
+function fmtTime(t){ return new Date(t).toLocaleTimeString(undefined,{hour:'numeric', minute:'2-digit'}); }
+function toast(msg){ const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(()=>el.classList.remove('show'), 2600); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* @detector-start ------------------------------------------------------
+   Pure sensor math — kept dependency-free so it can be unit-tested.   */
+
+/** Haversine distance in meters. */
+function haversine(lat1, lon1, lat2, lon2){
+  const R = 6371000, r = Math.PI/180;
+  const dLat = (lat2-lat1)*r, dLon = (lon2-lon1)*r;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*r)*Math.cos(lat2*r)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+/**
+ * Ollie detector — state machine over |accelerationIncludingGravity|.
+ * Signature of an ollie with the phone on your body:
+ *   1. POP: a sharp spike (legs extend) ...
+ *   2. AIR: near-weightlessness (magnitude ≪ 1g) sustained ~100-500 ms ...
+ *   3. LAND: an impact spike well above 1g.
+ * Walking/pushing rarely produces sustained sub-0.5g followed by a hard
+ * impact, and never with a pop right before — so all three are required.
+ */
+class OllieDetector {
+  constructor(opts = {}){
+    this.popT    = opts.popT    ?? 14;   // m/s² — takeoff spike threshold
+    this.airT    = opts.airT    ?? 4.8;  // m/s² — below this = airborne
+    this.landT   = opts.landT   ?? 19;   // m/s² — landing impact threshold
+    this.minAir  = opts.minAir  ?? 90;   // ms   — shortest countable air
+    this.maxAir  = opts.maxAir  ?? 900;  // ms   — longest plausible air
+    this.popWin  = opts.popWin  ?? 450;  // ms   — pop must precede air by ≤ this
+    this.refract = opts.refract ?? 500;  // ms   — dead time after a landing
+    this.reset();
+  }
+  reset(){ this.state = 'ground'; this.airStart = 0; this.lastLow = 0; this.lastPop = -1e12; this.lastOllie = -1e12; }
+  /** Feed one sample: t in ms, mag = |accelIncludingGravity| in m/s².
+   *  Returns {t, air} when an ollie lands, else null. */
+  sample(t, mag){
+    if (this.state === 'ground'){
+      if (mag >= this.popT) this.lastPop = t;   // pops only count from the ground — landing/mid-air spikes must not back-fill this
+      if (t - this.lastOllie >= this.refract && mag < this.airT){
+        this.state = 'air'; this.airStart = t; this.lastLow = t;
+      }
+    } else {
+      if (mag < this.airT) this.lastLow = t;
+      if (mag >= this.landT){
+        const air = (this.lastLow - this.airStart) + 40;   // + sample-interval pad
+        const popped = (this.airStart - this.lastPop) <= this.popWin;
+        this.state = 'ground';
+        if (air >= this.minAir && air <= this.maxAir && popped){
+          this.lastOllie = t;
+          return { t, air: Math.round(air) };
+        }
+      } else if (t - this.lastLow > 300 || t - this.airStart > this.maxAir + 300){
+        this.state = 'ground';    // drifted out of freefall with no impact
+      }
+    }
+    return null;
+  }
+}
+
+/** Build a GPX 1.1 track from route points [[lat, lon, tMs, spdMps], ...]. */
+function buildGPX(name, route){
+  const pts = route.map(p =>
+    `      <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"><time>${new Date(p[2]).toISOString()}</time></trkpt>`
+  ).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="OLLIELOG" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${name.replace(/[&<>]/g,'')}</name>
+    <trkseg>
+${pts}
+    </trkseg>
+  </trk>
+</gpx>`;
+}
+/* @detector-end -------------------------------------------------------- */
+
+/* ---------- sensitivity presets ---------- */
+const PRESETS = {
+  chill:  { airT: 5.6, landT: 16, minAir: 70,  popT: 12 },
+  std:    { airT: 4.8, landT: 19, minAir: 90,  popT: 14 },
+  strict: { airT: 4.2, landT: 22, minAir: 120, popT: 16 },
+};
+
+/* ---------- storage ---------- */
+const Store = {
+  KEY: 'ollielog.v1',
+  load(){ try { return JSON.parse(localStorage.getItem(this.KEY)) || { sessions: [], sens: 'std' }; }
+          catch { return { sessions: [], sens: 'std' }; } },
+  save(d){ try { localStorage.setItem(this.KEY, JSON.stringify(d)); }
+           catch { toast('Storage full — oldest session dropped'); d.sessions.pop(); localStorage.setItem(this.KEY, JSON.stringify(d)); } },
+};
+let DB = Store.load();
+
+/* ---------- session engine ---------- */
+const Engine = {
+  active: null, detector: null, watchId: null, wakeLock: null,
+  gravLP: null, gravRef: null, refN: 0,
+  wave: [],           // ring buffer of [t, mag] for the live canvas
+  lastPoint: null,
+
+  async start(){
+    const sens = PRESETS[DB.sens || 'std'];
+    this.detector = new OllieDetector(sens);
+    this.gravLP = null; this.gravRef = null; this.refN = 0; this.wave = []; this.lastPoint = null;
+    this.active = {
+      id: 'S' + Date.now().toString(36),
+      start: Date.now(), end: null,
+      ollies: [],                       // [{t, air}]
+      maxAccel: 0,                      // m/s², linear
+      maxLean: 0,                       // degrees from calibrated carry angle
+      maxSpeed: 0,                      // m/s
+      dist: 0,                          // meters
+      route: [],                        // [lat, lon, tMs, spdMps]
+    };
+
+    // Motion permission (iOS 13+ requires a user-gesture prompt)
+    let motionOK = true;
+    try {
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function'){
+        motionOK = (await DeviceMotionEvent.requestPermission()) === 'granted';
+      } else if (typeof DeviceMotionEvent === 'undefined'){ motionOK = false; }
+    } catch { motionOK = false; }
+    if (motionOK){
+      window.addEventListener('devicemotion', onMotion);
+      setChip('chip-motion', 'wait', 'Motion');
+      this._motionSeen = false;
+      setTimeout(() => { if (this.active && !this._motionSeen) setChip('chip-motion', 'err', 'No motion'); }, 3000);
+    } else {
+      setChip('chip-motion', 'err', 'Motion blocked');
+      showBanner('Motion sensors are blocked here. Ollie counting needs them — open this page in Safari/Chrome over HTTPS and allow Motion & Orientation.');
+    }
+
+    // GPS
+    if ('geolocation' in navigator){
+      setChip('chip-gps', 'wait', 'GPS…');
+      this.watchId = navigator.geolocation.watchPosition(onFix, () => setChip('chip-gps', 'err', 'GPS blocked'),
+        { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+    } else setChip('chip-gps', 'err', 'No GPS');
+
+    // Keep the screen awake — iOS pauses sensors when the screen locks
+    await this.grabWakeLock();
+
+    showView('live');
+    renderLive();
+    this._timer = setInterval(renderTimer, 500);
+    this._painter = setInterval(paintWave, 90);
+  },
+
+  async grabWakeLock(){
+    try {
+      this.wakeLock = await navigator.wakeLock.request('screen');
+      setChip('chip-wake', 'ok', 'Awake');
+      this.wakeLock.addEventListener('release', () => { if (this.active) setChip('chip-wake', 'wait', 'Screen'); });
+    } catch { setChip('chip-wake', 'wait', 'Keep screen on'); }
+  },
+
+  stop(){
+    if (!this.active) return;
+    window.removeEventListener('devicemotion', onMotion);
+    if (this.watchId != null) navigator.geolocation.clearWatch(this.watchId);
+    if (this.wakeLock) this.wakeLock.release().catch(()=>{});
+    clearInterval(this._timer); clearInterval(this._painter);
+    const s = this.active; this.active = null;
+    s.end = Date.now();
+    DB.sessions.unshift(s);
+    if (DB.sessions.length > 200) DB.sessions.length = 200;
+    Store.save(DB);
+    $('pocket').classList.remove('show');
+    renderHome();
+    openDetail(s.id);
+    toast(`Session saved — ${s.ollies.length} ollie${s.ollies.length === 1 ? '' : 's'}`);
+  },
+};
+
+/* ---------- sensor handlers ---------- */
+function onMotion(e){
+  const s = Engine.active; if (!s) return;
+  Engine._motionSeen = true;
+  const g = e.accelerationIncludingGravity;
+  if (!g || g.x == null) return;
+  const t = performance.now();
+  const mag = Math.hypot(g.x, g.y, g.z);
+  if (setChip._motion !== 'ok') setChip('chip-motion', 'ok', 'Motion');
+
+  // --- ollie detection ---
+  const hit = Engine.detector.sample(t, mag);
+  if (hit){
+    s.ollies.push({ t: Date.now(), air: hit.air });
+    onOllie(hit);
+  }
+
+  // --- peak linear force ---
+  let lin = null;
+  const a = e.acceleration;
+  if (a && a.x != null) lin = Math.hypot(a.x, a.y, a.z);
+  else lin = Math.abs(mag - 9.80665);
+  if (lin > s.maxAccel) s.maxAccel = lin;
+
+  // --- lean angle: deviation of low-passed gravity from the calibrated carry angle.
+  //     Only trust it when quasi-static (magnitude near 1g), never mid-trick. ---
+  const quasi = Math.abs(mag - 9.80665) < 2.5;
+  if (Engine.gravLP == null) Engine.gravLP = [g.x, g.y, g.z];
+  else {
+    const k = 0.12, lp = Engine.gravLP;
+    lp[0] += k*(g.x-lp[0]); lp[1] += k*(g.y-lp[1]); lp[2] += k*(g.z-lp[2]);
+  }
+  if (quasi){
+    const lp = Engine.gravLP;
+    if (Engine.refN < 60){ // calibrate carry angle over the first ~1s of stillness
+      if (Engine.gravRef == null) Engine.gravRef = [0,0,0];
+      const r = Engine.gravRef;
+      r[0]+=lp[0]; r[1]+=lp[1]; r[2]+=lp[2]; Engine.refN++;
+    } else {
+      const r = Engine.gravRef, rn = Math.hypot(r[0],r[1],r[2]), ln = Math.hypot(lp[0],lp[1],lp[2]);
+      if (rn > 1 && ln > 1){
+        const cos = Math.min(1, Math.max(-1, (r[0]*lp[0]+r[1]*lp[1]+r[2]*lp[2])/(rn*ln)));
+        const lean = Math.acos(cos) * 180/Math.PI;
+        if (lean > s.maxLean) s.maxLean = lean;
+      }
+    }
+  }
+
+  // --- waveform buffer (4 s) ---
+  Engine.wave.push([t, mag]);
+  const cutoff = t - 4000;
+  while (Engine.wave.length && Engine.wave[0][0] < cutoff) Engine.wave.shift();
+}
+
+function onFix(pos){
+  const s = Engine.active; if (!s) return;
+  const { latitude: lat, longitude: lon, speed, accuracy } = pos.coords;
+  if (accuracy != null && accuracy > 35) { setChip('chip-gps', 'wait', 'GPS ~' + Math.round(accuracy) + 'm'); return; }
+  setChip('chip-gps', 'ok', 'GPS lock');
+  const t = Date.now();
+  let spd = (speed != null && !isNaN(speed) && speed >= 0) ? speed : null;
+  if (Engine.lastPoint){
+    const [plat, plon, pt] = Engine.lastPoint;
+    const d = haversine(plat, plon, lat, lon);
+    const dt = (t - pt) / 1000;
+    if (spd == null && dt > 0.5) spd = d / dt;
+    if (d >= 3){ s.dist += d; Engine.lastPoint = [lat, lon, t]; s.route.push([lat, lon, t, spd ?? 0]); }
+  } else {
+    Engine.lastPoint = [lat, lon, t];
+    s.route.push([lat, lon, t, spd ?? 0]);
+  }
+  if (spd != null){
+    Engine.curSpeed = spd;
+    if (spd > s.maxSpeed && spd < 22) s.maxSpeed = spd;  // >50 mph on a board = GPS glitch
+  }
+  if (s.route.length > 4000) s.route.splice(0, s.route.length - 4000);
+  renderLiveTiles();
+}
+
+/* ---------- ollie feedback ---------- */
+let audioCtx = null;
+function onOllie(hit){
+  const s = Engine.active;
+  const el = $('live-count'); el.textContent = s.ollies.length;
+  el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  $('live-lastair').innerHTML = `last air <b class="num">${hit.air} ms</b>`;
+  $('pocket-count').textContent = s.ollies.length;
+  if (hit.air > (s._bestAir || 0)){ s._bestAir = hit.air; }
+  renderLiveTiles();
+  try { navigator.vibrate && navigator.vibrate(35); } catch {}
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+    o.type = 'square'; o.frequency.value = 780;
+    gn.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gn.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.09);
+    o.connect(gn); gn.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime + 0.1);
+  } catch {}
+}
+
+/* ---------- live rendering ---------- */
+function setChip(id, cls, label){
+  const el = $(id); el.className = 'chip ' + cls;
+  el.innerHTML = '<span class="led"></span>' + esc(label);
+  if (id === 'chip-motion') setChip._motion = cls;
+}
+function showBanner(msg){ const b = $('live-banner'); b.textContent = msg; b.style.display = 'block'; }
+function renderTimer(){ if (Engine.active) $('live-timer').textContent = fmtClock(Date.now() - Engine.active.start); }
+function renderLive(){
+  $('live-count').textContent = '0';
+  $('live-lastair').textContent = 'pop one to open the count';
+  $('live-banner').style.display = 'none';
+  $('pocket-count').textContent = '0';
+  renderLiveTiles(); renderTimer();
+}
+function renderLiveTiles(){
+  const s = Engine.active; if (!s) return;
+  const spd = (Engine.curSpeed || 0) * MPS2MPH;
+  $('lv-speed').innerHTML = `${fmt1(spd)}<span class="u">mph</span>`;
+  $('lv-maxspeed').innerHTML = `${fmt1(s.maxSpeed * MPS2MPH)}<span class="u">mph</span>`;
+  $('lv-dist').innerHTML = `${(s.dist * M2MI).toFixed(2)}<span class="u">mi</span>`;
+  $('lv-maxg').innerHTML = `${fmt1(s.maxAccel * MS2G)}<span class="u">g</span>`;
+  $('lv-lean').innerHTML = `${Math.round(s.maxLean)}<span class="u">°</span>`;
+  $('lv-air').innerHTML = s._bestAir ? `${s._bestAir}<span class="u">ms</span>` : '—';
+}
+
+/* live accelerometer waveform — single orange series, faint 1g/threshold grid */
+function paintWave(){
+  const cv = $('wave'); if (!cv || !Engine.active) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = cv.clientWidth, H = cv.clientHeight;
+  if (cv.width !== W*dpr){ cv.width = W*dpr; cv.height = H*dpr; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const MAX = 30; // m/s² full scale
+  const y = (m) => H - Math.min(m, MAX)/MAX * (H-6) - 3;
+  // grid: 1g line + landing threshold
+  ctx.strokeStyle = 'rgba(152,160,173,.18)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, y(9.81)); ctx.lineTo(W, y(9.81)); ctx.stroke();
+  ctx.strokeStyle = 'rgba(152,160,173,.10)';
+  ctx.beginPath(); ctx.moveTo(0, y(Engine.detector.landT)); ctx.lineTo(W, y(Engine.detector.landT)); ctx.stroke();
+  const w = Engine.wave; if (w.length < 2) return;
+  const t1 = w[w.length-1][0], t0 = t1 - 4000;
+  ctx.strokeStyle = '#F04D0E'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let i = 0; i < w.length; i++){
+    const px = (w[i][0]-t0)/4000 * W, py = y(w[i][1]);
+    i ? ctx.lineTo(px,py) : ctx.moveTo(px,py);
+  }
+  ctx.stroke();
+}
+
+/* ---------- home ---------- */
+function careerStats(){
+  const ss = DB.sessions;
+  const ollies = ss.reduce((n,s)=>n+s.ollies.length,0);
+  const bestAir = ss.reduce((b,s)=>Math.max(b, ...s.ollies.map(o=>o.air), 0), 0);
+  return { sessions: ss.length, ollies, bestAir };
+}
+function renderHome(){
+  const c = careerStats();
+  $('career-tiles').innerHTML = `
+    <div class="tile hero"><div><span class="k">Career ollies</span><br><span class="v display num">${c.ollies}</span></div>
+      <div style="text-align:right"><span class="k">Sessions</span><br><span class="v display num" style="font-size:34px">${c.sessions}</span></div></div>
+    <div class="tile"><span class="v display num">${c.bestAir || '—'}${c.bestAir?'<span class="u">ms</span>':''}</span><span class="k">Best air</span></div>
+    <div class="tile"><span class="v display num">${bestOf(s=>s.maxSpeed*MPS2MPH,1)}<span class="u">mph</span></span><span class="k">Fastest</span></div>
+    <div class="tile"><span class="v display num">${bestOf(s=>s.maxAccel*MS2G,1)}<span class="u">g</span></span><span class="k">Hardest hit</span></div>`;
+  const list = $('session-list');
+  if (!DB.sessions.length){
+    list.innerHTML = `<div class="empty card"><div class="big">🛹</div>No sessions yet.<br>Hit <b>Start session</b>, pocket the phone screen-on,<br>and go pop some ollies.<br><br><button class="iconbtn" id="btn-demo" style="color:var(--cone)">Load a demo session →</button></div>`;
+    const d = $('btn-demo'); if (d) d.onclick = loadDemo;
+  } else {
+    list.innerHTML = DB.sessions.map(s => `
+      <button class="listrow" data-id="${s.id}">
+        <span><span class="when">${fmtDate(s.start)} · ${fmtTime(s.start)}</span>
+        <span class="sub num">${fmtClock((s.end||s.start)-s.start)} · ${(s.dist*M2MI).toFixed(2)} mi · ${fmt1(s.maxSpeed*MPS2MPH)} mph top</span></span>
+        <span class="big display num">${s.ollies.length}</span>
+        <span class="arrow">›</span>
+      </button>`).join('');
+    list.querySelectorAll('.listrow').forEach(b => b.onclick = () => openDetail(b.dataset.id));
+  }
+  document.querySelectorAll('#sens-seg button').forEach(b =>
+    b.classList.toggle('on', b.dataset.s === (DB.sens || 'std')));
+}
+function bestOf(fn, dp){
+  if (!DB.sessions.length) return (0).toFixed(dp);
+  return Math.max(...DB.sessions.map(fn)).toFixed(dp);
+}
+
+/* ---------- detail ---------- */
+let currentId = null;
+function openDetail(id){
+  const s = DB.sessions.find(x => x.id === id); if (!s) return;
+  currentId = id;
+  $('d-title').textContent = fmtDate(s.start);
+  $('d-sub').textContent = `${fmtTime(s.start)} – ${fmtTime(s.end || s.start)} · ${fmtClock((s.end||s.start)-s.start)}`;
+  const airs = s.ollies.map(o => o.air);
+  const best = airs.length ? Math.max(...airs) : 0;
+  const avg = airs.length ? Math.round(airs.reduce((a,b)=>a+b,0)/airs.length) : 0;
+  const mins = ((s.end||s.start)-s.start)/60000;
+  const stat = (v,u,k) => `<div class="tile"><span class="v display num">${v}${u?`<span class="u">${u}</span>`:''}</span><span class="k">${k}</span></div>`;
+  $('d-stats').innerHTML =
+    stat(s.ollies.length,'','Ollies') +
+    stat(best||'—', best?'ms':'', 'Best air') +
+    stat(avg||'—', avg?'ms':'', 'Avg air') +
+    stat(fmt1(s.maxSpeed*MPS2MPH),'mph','Top speed') +
+    stat(fmt1(s.maxAccel*MS2G),'g','Peak force') +
+    stat(Math.round(s.maxLean),'°','Max lean') +
+    stat((s.dist*M2MI).toFixed(2),'mi','Distance') +
+    stat(mins>0.5 ? fmt1(s.ollies.length/mins) : '—', mins>0.5?'/min':'','Ollie rate') +
+    stat(s.route.length,'','GPS points');
+  renderAirChart(s);
+  renderRoute(s);
+  $('d-aircount').textContent = s.ollies.length ? `${s.ollies.length} landed` : '';
+  showView('detail');
+}
+
+/* airtime-per-ollie bars: one series, rounded data ends, longest bar direct-labeled */
+function renderAirChart(s){
+  const host = $('d-airchart');
+  const airs = s.ollies.map(o => o.air);
+  if (!airs.length){ host.innerHTML = '<div class="hint">No ollies were counted this session.</div>'; return; }
+  const H = 120, bw = 8, gap = 2, padT = 18;
+  const W = Math.max(airs.length * (bw+gap), 60);
+  const max = Math.max(...airs);
+  const iMax = airs.indexOf(max);
+  let bars = '', label = '';
+  airs.forEach((a, i) => {
+    const h = Math.max(4, (a/max) * (H - padT - 4));
+    const x = i*(bw+gap), y = H - h;
+    bars += `<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="3" fill="${i===iMax ? '#FF5A1F' : '#F04D0E'}"/>`;
+    if (i === iMax){
+      const anchor = i < airs.length/2 ? 'start' : 'end';
+      label = `<text x="${x + (anchor==='start'?bw+4:-4)}" y="${y+10}" text-anchor="${anchor}" font-size="11" font-weight="700" fill="#F2EFE6" font-family="inherit">${a} ms</text>`;
+    }
+  });
+  host.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Airtime per ollie, longest ${max} milliseconds">
+    <line x1="0" y1="${H-0.5}" x2="${W}" y2="${H-0.5}" stroke="rgba(152,160,173,.25)" stroke-width="1"/>${bars}${label}</svg>`;
+}
+
+/* route drawn as an SVG polyline — north-up, aspect-correct, start ring + end dot */
+function renderRoute(s){
+  const host = $('d-route');
+  if (s.route.length < 2){
+    host.innerHTML = '<div class="hint" style="padding:22px 14px">No route recorded — GPS never got a clean lock this session.</div>';
+    $('d-routemeta').textContent = ''; return;
+  }
+  const lats = s.route.map(p=>p[0]), lons = s.route.map(p=>p[1]);
+  const la0 = Math.min(...lats), la1 = Math.max(...lats);
+  const lo0 = Math.min(...lons), lo1 = Math.max(...lons);
+  const midLat = (la0+la1)/2 * Math.PI/180;
+  const spanY = Math.max(la1-la0, 1e-5);
+  const spanX = Math.max((lo1-lo0) * Math.cos(midLat), 1e-5);
+  const W = 400, pad = 24;
+  const H = Math.max(160, Math.min(400, (spanY/spanX) * (W - 2*pad) + 2*pad));
+  const sx = (W-2*pad)/spanX, sy = (H-2*pad)/spanY, k = Math.min(sx, sy);
+  const X = (lon) => pad + ((lon-lo0)*Math.cos(midLat)) * k + ((W-2*pad) - spanX*k)/2;
+  const Y = (lat) => H - pad - (lat-la0) * k - ((H-2*pad) - spanY*k)/2;
+  const d = s.route.map((p,i)=>`${i?'L':'M'}${X(p[1]).toFixed(1)} ${Y(p[0]).toFixed(1)}`).join('');
+  const st = s.route[0], en = s.route[s.route.length-1];
+  host.innerHTML = `<svg class="route" viewBox="0 0 ${W} ${Math.round(H)}" role="img" aria-label="Session route map">
+    <path d="${d}" fill="none" stroke="#F04D0E" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${X(st[1]).toFixed(1)}" cy="${Y(st[0]).toFixed(1)}" r="6" fill="none" stroke="#F2EFE6" stroke-width="2"/>
+    <circle cx="${X(en[1]).toFixed(1)}" cy="${Y(en[0]).toFixed(1)}" r="5" fill="#FF5A1F"/>
+  </svg>`;
+  const km = s.dist*M2MI;
+  $('d-routemeta').textContent = `${km.toFixed(2)} mi · ${s.route.length} pts`;
+}
+
+/* ---------- map + GPX export ---------- */
+function sessionSpot(s){ return s.route.length ? s.route[Math.floor(s.route.length/2)] : null; }
+function openMaps(kind){
+  const s = DB.sessions.find(x=>x.id===currentId); if (!s) return;
+  const p = sessionSpot(s);
+  if (!p){ toast('No GPS data on this session'); return; }
+  const [lat, lon] = p;
+  const url = kind === 'apple'
+    ? `https://maps.apple.com/?ll=${lat},${lon}&q=Skate%20Spot`
+    : `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+  window.open(url, '_blank');
+}
+function exportGPX(){
+  const s = DB.sessions.find(x=>x.id===currentId); if (!s) return;
+  if (!s.route.length){ toast('No GPS data on this session'); return; }
+  const gpx = buildGPX(`OLLIELOG ${fmtDate(s.start)}`, s.route);
+  const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `ollielog-${new Date(s.start).toISOString().slice(0,10)}.gpx`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  toast('GPX saved — open it in any maps/fitness app');
+}
+
+/* ---------- demo session (so the UI can be explored before skating) ---------- */
+function loadDemo(){
+  const t0 = Date.now() - 3600e3;
+  const base = [38.7031, -76.3358]; // a waterfront parking lot
+  const route = []; const ollies = [];
+  let lat = base[0], lon = base[1];
+  for (let i = 0; i < 90; i++){
+    const th = i/90 * Math.PI*2;
+    lat = base[0] + 0.0016*Math.sin(th) + 0.0002*Math.sin(th*5);
+    lon = base[1] + 0.0022*Math.cos(th) + 0.0003*Math.sin(th*3);
+    route.push([+lat.toFixed(6), +lon.toFixed(6), t0 + i*20e3, 2 + 1.5*Math.abs(Math.sin(th*2))]);
+  }
+  for (let i = 0; i < 23; i++){
+    ollies.push({ t: t0 + 120e3 + i*95e3, air: 180 + Math.round(160*Math.abs(Math.sin(i*2.7))) });
+  }
+  let dist = 0;
+  for (let i = 1; i < route.length; i++) dist += haversine(route[i-1][0],route[i-1][1],route[i][0],route[i][1]);
+  DB.sessions.unshift({ id: 'demo-'+t0.toString(36), start: t0, end: t0+32*60e3, ollies,
+    maxAccel: 41.2, maxLean: 38, maxSpeed: 5.9, dist, route, demo: true });
+  Store.save(DB); renderHome(); toast('Demo session added — tap it, then delete it when you like');
+}
+
+/* ---------- views & wiring ---------- */
+function showView(name){
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  $('view-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+}
+$('btn-start').onclick = () => Engine.start().catch(e => { toast('Could not start: ' + e.message); showView('home'); });
+$('btn-stop').onclick = () => { if (confirm('End this session?')) Engine.stop(); };
+$('btn-back').onclick = () => { renderHome(); showView('home'); };
+$('btn-delete').onclick = () => {
+  if (!confirm('Delete this session for good?')) return;
+  DB.sessions = DB.sessions.filter(s => s.id !== currentId);
+  Store.save(DB); renderHome(); showView('home'); toast('Session deleted');
+};
+$('btn-apple').onclick = () => openMaps('apple');
+$('btn-gmaps').onclick = () => openMaps('google');
+$('btn-gpx').onclick = exportGPX;
+document.querySelectorAll('#sens-seg button').forEach(b => b.onclick = () => {
+  DB.sens = b.dataset.s; Store.save(DB); renderHome();
+});
+
+/* pocket mode: near-black screen, wake lock alive, triple-tap to exit */
+$('btn-pocket').onclick = () => { $('pocket').classList.add('show'); };
+let taps = [];
+$('pocket').addEventListener('pointerdown', () => {
+  const now = Date.now();
+  taps = taps.filter(t => now - t < 900); taps.push(now);
+  if (taps.length >= 3){ $('pocket').classList.remove('show'); taps = []; }
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Engine.active) Engine.grabWakeLock();
+});
+window.addEventListener('beforeunload', (e) => {
+  if (Engine.active){ e.preventDefault(); e.returnValue = ''; }
+});
+
+/* service worker — only when served from a real origin (skipped on artifact/preview hosts) */
+if ('serviceWorker' in navigator && location.protocol === 'https:'){
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+renderHome();
+</script>
+</body>
+</html>
