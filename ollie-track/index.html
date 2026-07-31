@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <meta name="description" content="OllieTrack — real-time skateboarding ollie counter + session stats using your phone sensors" />
+  <link rel="manifest" href="manifest.json" />
+  <title>OllieTrack</title>
+  <style>
+    :root {
+      --bg: #070708;
+      --surface: #121214;
+      --surface2: #1c1c1f;
+      --border: #2a2a2e;
+      --text: #f5f5f7;
+      --text-dim: #a1a1a6;
+      --accent: #00f5d4;
+      --accent-dim: rgba(0, 245, 212, 0.15);
+      --pink: #f15bb5;
+      --yellow: #fee440;
+      --red: #ff5e5b;
+      --green: #00c853;
+      --radius: 16px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bottom);
+    }
+
+    /* Screens */
+    .screen {
+      display: none;
+      min-height: 100dvh;
+      flex-direction: column;
+      padding: 16px;
+      padding-bottom: calc(16px + var(--safe-bottom));
+    }
+    .screen.active {
+      display: flex;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo span {
+      background: linear-gradient(135deg, var(--accent), var(--pink));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .icon-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .icon-btn:active {
+      transform: scale(0.94);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    /* Big Start Button */
+    .start-btn {
+      width: 100%;
+      height: 72px;
+      border: none;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--accent), #00c4a7);
+      color: #000;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 8px 32px rgba(0, 245, 212, 0.25);
+      transition: transform 0.15s, box-shadow 0.15s;
+      margin: 8px 0 24px;
+    }
+    .start-btn:active {
+      transform: scale(0.97);
+      box-shadow: 0 4px 16px rgba(0, 245, 212, 0.2);
+    }
+    .start-btn.recording {
+      background: linear-gradient(135deg, var(--red), #ff3b30);
+      box-shadow: 0 8px 32px rgba(255, 94, 91, 0.3);
+      color: white;
+    }
+
+    /* Live Dashboard */
+    #live-screen {
+      background: radial-gradient(ellipse at top, #0f1a1a 0%, var(--bg) 60%);
+    }
+    .live-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .timer {
+      font-variant-numeric: tabular-nums;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-dim);
+      background: var(--surface);
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
+    .ollie-big {
+      text-align: center;
+      margin: 12px 0 20px;
+    }
+    .ollie-count {
+      font-size: 96px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -4px;
+      background: linear-gradient(180deg, #fff 30%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 60px rgba(0, 245, 212, 0.3);
+    }
+    .ollie-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Metrics grid */
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 12px;
+      text-align: center;
+    }
+    .metric-value {
+      font-size: 26px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -1px;
+    }
+    .metric-unit {
+      font-size: 12px;
+      color: var(--text-dim);
+      font-weight: 500;
+    }
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    /* G-force bar */
+    .gforce-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .gforce-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .gforce-bar {
+      height: 12px;
+      background: var(--surface2);
+      border-radius: 6px;
+      overflow: hidden;
+      position: relative;
+    }
+    .gforce-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--yellow), var(--red));
+      border-radius: 6px;
+      transition: width 0.08s linear;
+    }
+    .gforce-peak {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: white;
+      opacity: 0.7;
+    }
+
+    /* Sensitivity */
+    .sens-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+    }
+    .sens-row label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 6px;
+      background: var(--surface2);
+      border-radius: 3px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 245, 212, 0.4);
+    }
+
+    /* Stop button */
+    .stop-btn {
+      width: 100%;
+      height: 64px;
+      border: none;
+      border-radius: 18px;
+      background: var(--red);
+      color: white;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: auto;
+      box-shadow: 0 8px 28px rgba(255, 94, 91, 0.35);
+    }
+    .stop-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Manual ollie button (fallback) */
+    .manual-ollie {
+      width: 100%;
+      height: 52px;
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      background: transparent;
+      color: var(--text-dim);
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+    .manual-ollie:active {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* History list */
+    .session-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .session-item:active {
+      border-color: var(--accent);
+    }
+    .session-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+    .session-date {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .session-ollies {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+    .session-stats {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .session-stats span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text-dim);
+    }
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    /* Detail / Summary */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .sum-card {
+      background: var(--surface2);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+    .sum-value {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+    .sum-label {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 2px;
+      text-transform: uppercase;
+    }
+
+    .action-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .action-btn {
+      height: 52px;
+      border-radius: 14px;
+      border: none;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .action-btn.primary {
+      background: var(--accent);
+      color: #000;
+    }
+    .action-btn.secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .action-btn.danger {
+      background: transparent;
+      color: var(--red);
+      border: 1px solid var(--red);
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: calc(24px + var(--safe-bottom));
+      left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      background: var(--surface2);
+      color: var(--text);
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      z-index: 100;
+      transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+      max-width: 90%;
+      text-align: center;
+    }
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.success {
+      border-color: var(--accent);
+    }
+
+    /* Flash on ollie */
+    .ollie-flash {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle, rgba(0,245,212,0.25) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0;
+      z-index: 50;
+      transition: opacity 0.15s;
+    }
+    .ollie-flash.on {
+      opacity: 1;
+    }
+
+    /* Status pill */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-dim);
+    }
+    .status-dot.live {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Settings modal simple */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 80;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay.show {
+      display: flex;
+    }
+    .sheet {
+      background: var(--surface);
+      border-radius: 24px 24px 0 0;
+      padding: 24px 20px calc(24px + var(--safe-bottom));
+      width: 100%;
+      max-width: 500px;
+      border: 1px solid var(--border);
+      border-bottom: none;
+    }
+    .sheet h3 {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+    .sheet p {
+      font-size: 14px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    /* Small helpers */
+    .back-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      padding: 8px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ollie-flash" id="ollieFlash"></div>
+  <div class="toast" id="toast"></div>
+
+  <!-- HOME SCREEN -->
+  <div class="screen active" id="home-screen">
+    <div class="header">
+      <div class="logo">🛹 <span>OllieTrack</span></div>
+      <button class="icon-btn" id="infoBtn" title="Info">ⓘ</button>
+    </div>
+
+    <button class="start-btn" id="startBtn">
+      <span>▶</span> Start Session
+    </button>
+
+    <div class="card" style="margin-bottom: 20px;">
+      <div class="card-title">How it works</div>
+      <p style="font-size: 14px; color: var(--text-dim); line-height: 1.5;">
+        Put your phone in a pocket or mount it. The app uses the accelerometer to detect the pop + airtime of an ollie. GPS records your route and speed. Everything stays on your device.
+      </p>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <div class="card-title" style="margin: 0;">Past Sessions</div>
+      <button class="icon-btn" id="clearAllBtn" style="width: 36px; height: 36px; font-size: 14px;" title="Clear all">🗑</button>
+    </div>
+    <div id="sessionList"></div>
+    <div class="empty" id="emptyState" style="display: none;">
+      <div class="empty-icon">🛹</div>
+      <div>No sessions yet.<br>Hit Start and go skate.</div>
+    </div>
+  </div>
+
+  <!-- LIVE SESSION SCREEN -->
+  <div class="screen" id="live-screen">
+    <div class="live-header">
+      <div class="status-pill">
+        <div class="status-dot live" id="liveDot"></div>
+        <span id="liveStatus">Recording</span>
+      </div>
+      <div class="timer" id="timer">00:00</div>
+    </div>
+
+    <div class="ollie-big">
+      <div class="ollie-count" id="ollieCount">0</div>
+      <div class="ollie-label">Ollies</div>
+    </div>
+
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value" id="maxG">0.0</div>
+        <div class="metric-unit">g</div>
+        <div class="metric-label">Peak Accel</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="maxSpeed">0.0</div>
+        <div class="metric-unit">mph</div>
+        <div class="metric-label">Top Speed</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="maxTilt">0</div>
+        <div class="metric-unit">°</div>
+        <div class="metric-label">Max Tilt</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="distance">0.00</div>
+        <div class="metric-unit">mi</div>
+        <div class="metric-label">Distance</div>
+      </div>
+    </div>
+
+    <div class="gforce-wrap">
+      <div class="gforce-header">
+        <span>Live G-Force</span>
+        <span id="currentG">0.00 g</span>
+      </div>
+      <div class="gforce-bar">
+        <div class="gforce-fill" id="gforceFill"></div>
+        <div class="gforce-peak" id="gforcePeak" style="left: 0%"></div>
+      </div>
+    </div>
+
+    <div class="sens-row">
+      <label>Sensitivity</label>
+      <input type="range" id="sensSlider" min="0.6" max="1.4" step="0.05" value="1.0" />
+      <span id="sensVal" style="font-size: 13px; font-weight: 700; width: 36px; text-align: right;">1.0</span>
+    </div>
+
+    <button class="manual-ollie" id="manualOllieBtn">+ Manual Ollie (if sensors miss)</button>
+
+    <button class="stop-btn" id="stopBtn">End Session</button>
+  </div>
+
+  <!-- SUMMARY SCREEN -->
+  <div class="screen" id="summary-screen">
+    <button class="back-btn" id="backFromSummary">← Home</button>
+    <h2 style="font-size: 24px; font-weight: 800; margin: 8px 0 4px;" id="summaryTitle">Session Complete</h2>
+    <div style="font-size: 14px; color: var(--text-dim); margin-bottom: 8px;" id="summarySub"></div>
+
+    <div class="summary-grid">
+      <div class="sum-card">
+        <div class="sum-value" id="sumOllies">0</div>
+        <div class="sum-label">Ollies</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-value" id="sumDuration">0:00</div>
+        <div class="sum-label">Duration</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-value" id="sumMaxG">0.0</div>
+        <div class="sum-label">Peak G</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-value" id="sumMaxSpeed">0.0</div>
+        <div class="sum-label">Top mph</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-value" id="sumTilt">0°</div>
+        <div class="sum-label">Max Tilt</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-value" id="sumDist">0.00</div>
+        <div class="sum-label">Miles</div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="action-btn primary" id="openMapsBtn">🗺 Open Route in Maps</button>
+      <button class="action-btn secondary" id="exportGpxBtn">⬇ Download GPX Track</button>
+      <button class="action-btn secondary" id="shareBtn">Share Stats</button>
+      <button class="action-btn danger" id="deleteSessionBtn">Delete Session</button>
+    </div>
+  </div>
+
+  <!-- INFO SHEET -->
+  <div class="overlay" id="infoOverlay">
+    <div class="sheet">
+      <h3>OllieTrack Tips</h3>
+      <p><strong>Best results:</strong> Keep the phone in a front or side pocket, or use a tight mount. Loose bags add noise.</p>
+      <p><strong>Ollie detection:</strong> Looks for a strong pop followed by a short freefall window. Adjust Sensitivity if it misses soft pops or counts too many curbs.</p>
+      <p><strong>Permissions:</strong> Motion & Location are required. On iPhone you must allow them when prompted (one-time).</p>
+      <p><strong>Privacy:</strong> Everything stays in your browser’s localStorage. No accounts, no servers, no tracking.</p>
+      <p style="margin-top: 16px; font-size: 12px; opacity: 0.6;">Built for one-click Netlify Drop. Works offline after first load.</p>
+      <button class="action-btn primary" style="margin-top: 16px; width: 100%;" id="closeInfo">Got it</button>
+    </div>
+  </div>
+
+  <script>
+    // ========== STATE ==========
+    const STORAGE_KEY = 'ollieTrack_v1';
+    let sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    let current = null; // active session object
+    let motionHandler = null;
+    let orientHandler = null;
+    let geoWatchId = null;
+    let timerInterval = null;
+    let wakeLock = null;
+    let lastOllieTime = 0;
+    let ollieState = 'ground'; // ground | popped | air
+    let airStart = 0;
+    let peakTime = 0;
+    let currentSessionId = null;
+
+    // Tunables (scaled by sensitivity)
+    let sens = 1.0;
+    const BASE_POP = 16.5;      // m/s² roughly 1.7g above gravity contribution
+    const BASE_FREEFALL = 4.0;  // below this = air
+    const MIN_AIR_MS = 90;
+    const MAX_AIR_MS = 650;
+    const DEBOUNCE_MS = 900;
+
+    // ========== HELPERS ==========
+    function $(id) { return document.getElementById(id); }
+    function showScreen(id) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      $(id).classList.add('active');
+    }
+    function toast(msg, success = false) {
+      const t = $('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (success ? ' success' : '');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    }
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000);
+      const m = Math.floor(s / 60);
+      const sec = s % 60;
+      return `${m}:${sec.toString().padStart(2, '0')}`;
+    }
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 3958.8; // miles
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    function sampleTrack(track, maxPoints = 12) {
+      if (track.length <= maxPoints) return track;
+      const step = (track.length - 1) / (maxPoints - 1);
+      const out = [];
+      for (let i = 0; i < maxPoints; i++) {
+        out.push(track[Math.round(i * step)]);
+      }
+      return out;
+    }
+
+    // ========== RENDER HOME ==========
+    function renderHome() {
+      const list = $('sessionList');
+      const empty = $('emptyState');
+      list.innerHTML = '';
+      if (sessions.length === 0) {
+        empty.style.display = 'block';
+        return;
+      }
+      empty.style.display = 'none';
+      // newest first
+      [...sessions].reverse().forEach(s => {
+        const el = document.createElement('div');
+        el.className = 'session-item';
+        el.innerHTML = `
+          <div class="session-top">
+            <div class="session-date">${s.name}</div>
+            <div class="session-ollies">${s.ollies}</div>
+          </div>
+          <div class="session-stats">
+            <span>⏱ ${formatTime(s.durationMs)}</span>
+            <span>⚡ ${s.maxG.toFixed(1)}g</span>
+            <span>🚀 ${s.maxSpeedMph.toFixed(1)} mph</span>
+            <span>📐 ${Math.round(s.maxTilt)}°</span>
+            <span>📍 ${s.distanceMi.toFixed(2)} mi</span>
+          </div>
+        `;
+        el.onclick = () => openSummary(s.id);
+        list.appendChild(el);
+      });
+    }
+
+    // ========== PERMISSIONS ==========
+    async function requestPermissions() {
+      // iOS motion permission
+      if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+        try {
+          const state = await DeviceMotionEvent.requestPermission();
+          if (state !== 'granted') {
+            toast('Motion permission denied. Manual mode only.');
+            return false;
+          }
+        } catch (e) {
+          toast('Could not get motion permission');
+          return false;
+        }
+      }
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          await DeviceOrientationEvent.requestPermission();
+        } catch (e) {}
+      }
+      // Geolocation will prompt on first watchPosition
+      return true;
+    }
+
+    // ========== SESSION LOGIC ==========
+    async function startSession() {
+      const ok = await requestPermissions();
+      // even if motion fails we still allow session with GPS + manual
+
+      current = {
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        name: new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+        startTs: Date.now(),
+        endTs: null,
+        durationMs: 0,
+        ollies: 0,
+        maxG: 0,
+        maxSpeedMph: 0,
+        maxTilt: 0,
+        distanceMi: 0,
+        track: [],
+        airTimes: []
+      };
+      currentSessionId = current.id;
+      ollieState = 'ground';
+      lastOllieTime = 0;
+      airStart = 0;
+
+      // UI
+      $('ollieCount').textContent = '0';
+      $('maxG').textContent = '0.0';
+      $('maxSpeed').textContent = '0.0';
+      $('maxTilt').textContent = '0';
+      $('distance').textContent = '0.00';
+      $('currentG').textContent = '0.00 g';
+      $('gforceFill').style.width = '0%';
+      $('timer').textContent = '00:00';
+      showScreen('live-screen');
+
+      // Timer
+      timerInterval = setInterval(() => {
+        if (!current) return;
+        const elapsed = Date.now() - current.startTs;
+        $('timer').textContent = formatTime(elapsed);
+      }, 250);
+
+      // Wake lock
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (e) {}
+
+      // Motion
+      motionHandler = (e) => processMotion(e);
+      window.addEventListener('devicemotion', motionHandler, { passive: true });
+
+      // Orientation for tilt
+      orientHandler = (e) => {
+        if (!current) return;
+        const beta = Math.abs(e.beta || 0);
+        const gamma = Math.abs(e.gamma || 0);
+        const tilt = Math.max(beta, gamma);
+        if (tilt > current.maxTilt) {
+          current.maxTilt = tilt;
+          $('maxTilt').textContent = Math.round(tilt);
+        }
+      };
+      window.addEventListener('deviceorientation', orientHandler, { passive: true });
+
+      // GPS
+      if ('geolocation' in navigator) {
+        geoWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            if (!current) return;
+            const c = pos.coords;
+            const spd = (c.speed || 0) * 2.23694; // m/s → mph
+            if (spd > current.maxSpeedMph) {
+              current.maxSpeedMph = spd;
+              $('maxSpeed').textContent = spd.toFixed(1);
+            }
+            // only keep decent points
+            if (c.accuracy && c.accuracy > 40) return;
+            const last = current.track[current.track.length - 1];
+            if (last) {
+              const d = haversine(last.lat, last.lon, c.latitude, c.longitude);
+              // ignore GPS jumps > 80m in one tick
+              if (d < 0.05) {
+                current.distanceMi += d;
+                $('distance').textContent = current.distanceMi.toFixed(2);
+              }
+            }
+            current.track.push({
+              lat: c.latitude,
+              lon: c.longitude,
+              t: Date.now(),
+              speed: spd,
+              acc: c.accuracy || 0
+            });
+          },
+          (err) => {
+            console.warn('GPS', err);
+            $('liveStatus').textContent = 'GPS weak';
+          },
+          { enableHighAccuracy: true, maximumAge: 800, timeout: 12000 }
+        );
+      } else {
+        toast('No GPS available on this device');
+      }
+    }
+
+    function processMotion(e) {
+      if (!current) return;
+      const acc = e.accelerationIncludingGravity || e.acceleration;
+      if (!acc || acc.x == null) return;
+
+      const mag = Math.sqrt(acc.x * acc.x + acc.y * acc.y + acc.z * acc.z);
+      // Live UI
+      const g = mag / 9.80665;
+      $('currentG').textContent = g.toFixed(2) + ' g';
+      const pct = Math.min(100, (g / 4) * 100); // scale to ~4g = 100%
+      $('gforceFill').style.width = pct + '%';
+
+      if (g > current.maxG) {
+        current.maxG = g;
+        $('maxG').textContent = g.toFixed(1);
+        $('gforcePeak').style.left = pct + '%';
+      }
+
+      // ----- Ollie state machine -----
+      const now = Date.now();
+      const popThresh = BASE_POP * sens;
+      const freeThresh = BASE_FREEFALL / sens; // higher sens = easier freefall detect
+
+      if (ollieState === 'ground') {
+        if (mag > popThresh) {
+          ollieState = 'popped';
+          peakTime = now;
+        }
+      } else if (ollieState === 'popped') {
+        if (mag < freeThresh) {
+          ollieState = 'air';
+          airStart = now;
+        } else if (now - peakTime > 400) {
+          ollieState = 'ground'; // no air followed
+        }
+      } else if (ollieState === 'air') {
+        const airMs = now - airStart;
+        if (mag > freeThresh + 2) {
+          // landed
+          if (airMs >= MIN_AIR_MS && airMs <= MAX_AIR_MS && (now - lastOllieTime) > DEBOUNCE_MS) {
+            registerOllie(airMs);
+          }
+          ollieState = 'ground';
+        } else if (airMs > MAX_AIR_MS + 200) {
+          ollieState = 'ground'; // too long, ignore
+        }
+      }
+    }
+
+    function registerOllie(airMs) {
+      current.ollies += 1;
+      current.airTimes.push(airMs);
+      lastOllieTime = Date.now();
+      $('ollieCount').textContent = current.ollies;
+      // visual feedback
+      const flash = $('ollieFlash');
+      flash.classList.add('on');
+      setTimeout(() => flash.classList.remove('on'), 180);
+      // tiny vibration if available
+      if (navigator.vibrate) navigator.vibrate(40);
+    }
+
+    function stopSession() {
+      if (!current) return;
+      current.endTs = Date.now();
+      current.durationMs = current.endTs - current.startTs;
+
+      // cleanup listeners
+      if (motionHandler) window.removeEventListener('devicemotion', motionHandler);
+      if (orientHandler) window.removeEventListener('deviceorientation', orientHandler);
+      if (geoWatchId != null) {
+        navigator.geolocation.clearWatch(geoWatchId);
+        geoWatchId = null;
+      }
+      if (timerInterval) clearInterval(timerInterval);
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+
+      // save
+      sessions.push(current);
+      // keep last 40
+      if (sessions.length > 40) sessions = sessions.slice(-40);
+      save();
+
+      const finished = current;
+      current = null;
+      openSummary(finished.id);
+      toast('Session saved', true);
+    }
+
+    // ========== SUMMARY ==========
+    function openSummary(id) {
+      const s = sessions.find(x => x.id === id);
+      if (!s) return;
+      currentSessionId = id;
+
+      $('summaryTitle').textContent = s.name;
+      $('summarySub').textContent = new Date(s.startTs).toLocaleString();
+      $('sumOllies').textContent = s.ollies;
+      $('sumDuration').textContent = formatTime(s.durationMs);
+      $('sumMaxG').textContent = s.maxG.toFixed(1) + 'g';
+      $('sumMaxSpeed').textContent = s.maxSpeedMph.toFixed(1);
+      $('sumTilt').textContent = Math.round(s.maxTilt) + '°';
+      $('sumDist').textContent = s.distanceMi.toFixed(2);
+
+      // wire buttons for this session
+      $('openMapsBtn').onclick = () => openInMaps(s);
+      $('exportGpxBtn').onclick = () => downloadGPX(s);
+      $('shareBtn').onclick = () => shareSession(s);
+      $('deleteSessionBtn').onclick = () => {
+        if (confirm('Delete this session?')) {
+          sessions = sessions.filter(x => x.id !== id);
+          save();
+          renderHome();
+          showScreen('home-screen');
+          toast('Deleted');
+        }
+      };
+
+      showScreen('summary-screen');
+    }
+
+    function openInMaps(s) {
+      if (!s.track || s.track.length < 1) {
+        toast('No GPS points recorded');
+        return;
+      }
+      const pts = sampleTrack(s.track, 14);
+      // Google Maps directions style works well on mobile
+      const path = pts.map(p => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`).join('/');
+      const url = `https://www.google.com/maps/dir/${path}`;
+      window.open(url, '_blank');
+    }
+
+    function downloadGPX(s) {
+      if (!s.track || s.track.length < 2) {
+        toast('Need more GPS points for a track');
+        return;
+      }
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="OllieTrack" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata><name>${escapeXml(s.name)}</name><time>${new Date(s.startTs).toISOString()}</time></metadata>
+  <trk>
+    <name>${escapeXml(s.name)}</name>
+    <trkseg>
+`;
+      s.track.forEach(p => {
+        xml += `      <trkpt lat="${p.lat}" lon="${p.lon}"><time>${new Date(p.t).toISOString()}</time></trkpt>\n`;
+      });
+      xml += `    </trkseg>
+  </trk>
+</gpx>`;
+      const blob = new Blob([xml], { type: 'application/gpx+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `ollietrack-${s.id}.gpx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('GPX downloaded — open in Apple Maps or Gaia etc.', true);
+    }
+
+    function escapeXml(str) {
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function shareSession(s) {
+      const text = `OllieTrack Session\n${s.name}\nOllies: ${s.ollies}\nPeak: ${s.maxG.toFixed(1)}g\nTop speed: ${s.maxSpeedMph.toFixed(1)} mph\nDistance: ${s.distanceMi.toFixed(2)} mi\nDuration: ${formatTime(s.durationMs)}`;
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'OllieTrack', text });
+        } catch (e) {}
+      } else {
+        await navigator.clipboard.writeText(text);
+        toast('Stats copied to clipboard', true);
+      }
+    }
+
+    // ========== UI WIRING ==========
+    $('startBtn').addEventListener('click', startSession);
+    $('stopBtn').addEventListener('click', stopSession);
+    $('manualOllieBtn').addEventListener('click', () => {
+      if (current) registerOllie(200);
+    });
+    $('backFromSummary').addEventListener('click', () => {
+      renderHome();
+      showScreen('home-screen');
+    });
+    $('infoBtn').addEventListener('click', () => $('infoOverlay').classList.add('show'));
+    $('closeInfo').addEventListener('click', () => $('infoOverlay').classList.remove('show'));
+    $('infoOverlay').addEventListener('click', (e) => {
+      if (e.target === $('infoOverlay')) $('infoOverlay').classList.remove('show');
+    });
+    $('clearAllBtn').addEventListener('click', () => {
+      if (sessions.length && confirm('Delete ALL sessions? This cannot be undone.')) {
+        sessions = [];
+        save();
+        renderHome();
+        toast('All cleared');
+      }
+    });
+    $('sensSlider').addEventListener('input', (e) => {
+      sens = parseFloat(e.target.value);
+      $('sensVal').textContent = sens.toFixed(2);
+    });
+
+    // Prevent accidental zoom / pull-to-refresh noise
+    document.addEventListener('gesturestart', e => e.preventDefault());
+
+    // Init
+    renderHome();
+
+    // PWA service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
